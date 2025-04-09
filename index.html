@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>智能单词闪卡系统</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MMDS83C307"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-MMDS83C307');
+  </script>
+
+  <style>
+    :root {
+      --primary-color: #2196F3;
+      --success-color: #4CAF50;
+      --error-color: #f44336;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      margin: 0;
+      padding: 15px;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    .stats {
+      position: fixed;
+      left: 15px;
+      top: 15px;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      font-size: 16px;
+      z-index: 100;
+      min-width: 120px;
+      text-align: center;
+    }
+
+    .flashcard-wrapper {
+      width: 100%;
+      height: 50vh;
+      min-height: 300px;
+      margin: 70px 0 30px;
+      flex-shrink: 0;
+    }
+
+    .flashcard-container {
+      perspective: 1000px;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .flashcard {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      transform-style: preserve-3d;
+      transition: transform 0.4s;
+      touch-action: manipulation;
+    }
+
+    .flashcard.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-sizing: border-box;
+      overflow: auto;
+    }
+
+    .front {
+      font-size: 2.4rem;
+      color: var(--primary-color);
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .back {
+      transform: rotateY(180deg);
+      padding: 20px;
+    }
+
+    .translation {
+      font-size: 2rem;
+      color: var(--success-color);
+      margin: 15px 0;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin: 20px 0;
+      width: 100%;
+      position: relative;
+      z-index: 50;
+    }
+
+    button {
+      padding: 16px 20px;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 1.1rem;
+      flex: 1;
+      min-width: 44px;
+      min-height: 44px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .master-btn {
+      background: var(--success-color);
+      color: white;
+    }
+
+    .next-btn {
+      background: #FF9800;
+      color: white;
+    }
+
+    .manage-panel {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mastered-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100vh;
+      background: white;
+      padding: 20px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s;
+      z-index: 200;
+    }
+
+    .mastered-panel.active {
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 15px;
+    }
+
+    .panel-header h3 {
+      margin: 0;
+      flex: 1;
+    }
+
+    .close-btn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      padding: 8px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .close-btn:hover {
+      background: #1976D2;
+      transform: translateY(-1px);
+    }
+
+    .mastered-item {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+      font-size: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.3s;
+    }
+
+    .mastered-item:hover {
+      background: #f5f5f5;
+    }
+
+    .delete-btn {
+      color: var(--error-color);
+      font-size: 1.2rem;
+      padding: 8px;
+      margin-left: 10px;
+    }
+
+    .privacy-notice {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: #666;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      z-index: 90;
+    }
+
+    /* 新增在原有样式末尾，媒体查询前 */
+    .speaker-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 5px;
+      z-index: 10;
+    }
+
+    .speaker-btn:active {
+      transform: scale(0.9);
+    }
+
+    /* ===== 筛选面板样式 ===== */
+    .filter-panel {
+      position: fixed;
+      left: 15px;
+      top: 70px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      display: flex;
+      gap: 12px;
+      flex-direction: column;
+      /* 🟢 新增：竖排布局 */
+    }
+
+    /* 🟢 新增：竖排内部容器 */
+    .filter-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      font-size: 0.95rem;
+      color: #666;
+    }
+
+    .custom-select {
+      position: relative;
+      min-width: 120px;
+    }
+
+    .select-header {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8f8f8;
+    }
+
+    .select-options {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 200;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+      /* 🟢 新增动画属性 */
+      transition: opacity 0.2s, transform 0.2s;
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+    }
+
+    /* 🟢 新增：下拉菜单激活状态 */
+    .select-options[style*="display: block"] {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .select-options div {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .select-options div:hover {
+      background: #f5f5f5;
+    }
+
+    .select-all {
+      color: var(--primary-color);
+      font-weight: bold;
+      border-bottom: 1px solid #eee;
+    }
+
+    .confirm-btn {
+      background: var(--primary-color);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      width: 100%;
+      /* 🟢 新增：按钮占满宽度 */
+    }
+
+    .confirm-btn:active {
+      opacity: 0.8;
+    }
+
+    .selected-info {
+      position: fixed;
+      left: 15px;
+      top: 140px;
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      font-size: 0.9rem;
+      color: #666;
+      display: none;
+      /* 🟢 新增：默认隐藏 */
+      flex-direction: column;
+      /* 🟢 新增：竖排布局 */
+      gap: 8px;
+      /* 🟢 新增：子项间距 */
+    }
+
+    /* 🔵 修改：子项竖排样式（原为横向排列） */
+    .selected-info div {
+      display: flex;
+      flex-direction: column;
+      /* 修改为竖排 */
+      gap: 5px;
+    }
+
+    /* 🟢 新增：选项列表容器和项样式 */
+    .selection-items {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-left: 15px;
+    }
+
+    .selected-item {
+      padding: 4px 8px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+
+    @media (max-width: 768px) {
+      .filter-panel {
+        top: 60px;
+        left: 10px;
+        right: 10px;
+        flex-direction: column;
+      }
+
+      .selected-info {
+        display: none;
+      }
+    }
+
+    #details {
+      font-size: 1rem;
+      color: #666;
+      text-align: center;
+      line-height: 1.4;
+      margin-top: 15px;
+      padding: 0 10px;
+    }
+
+    @media (min-width: 768px) {
+      body {
+        padding: 20px;
+        max-width: 500px;
+        margin: 0 auto;
+      }
+
+      .flashcard-wrapper {
+        height: 280px;
+        margin: 30px 0;
+      }
+
+      .front {
+        font-size: 2.5rem;
+      }
+
+      .translation {
+        font-size: 1.8rem;
+      }
+
+      .manage-panel {
+        width: auto;
+        left: auto;
+        right: 20px;
+        transform: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats {
+        padding: 12px 15px;
+        font-size: 14px;
+        left: 10px;
+        top: 10px;
+      }
+
+      .flashcard-wrapper {
+        height: 55vh;
+        min-height: 250px;
+        margin: 60px 0 25px;
+      }
+
+      .front {
+        font-size: 2rem;
+        padding: 15px;
+      }
+
+      .translation {
+        font-size: 1.8rem;
+      }
+
+      .controls {
+        flex-direction: row;
+        margin: 15px 0;
+        gap: 8px;
+      }
+
+      button {
+        width: auto;
+        padding: 12px 15px !important;
+        font-size: 1rem !important;
+      }
+
+      .next-btn {
+        position: relative;
+        font-size: 0;
+        /* 隐藏原始文字 */
+      }
+
+      .next-btn::after {
+        content: "下一个";
+        font-size: 1rem !important;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+      }
+
+      .privacy-notice {
+        bottom: 90px;
+        font-size: 0.75rem;
+        padding: 10px;
+      }
+
+      .speaker-btn {
+        font-size: 1.2rem;
+        top: 10px;
+        right: 10px;
+      }
+    }
+  </style>
+  <script>
+    const embeddedWordData = {
+      "一年级上": {
+        "Module1": [
+          {
+            "word": "hello",
+            "translation": "你好",
+            "pos": "名词",
+            "definition": "Hello! 你好！",
+            "example": "Hello! 你好！"
+          },
+          {
+            "word": "am",
+            "translation": "是（我是）",
+            "pos": "名词",
+            "definition": "am",
+            "example": "The American team won the championship."
+          },
+          {
+            "word": "goodbye",
+            "translation": "再见",
+            "pos": "名词",
+            "definition": "Goodbye is an action that means to send a message to someone you miss. It also implies leaving behind something or someone.",
+            "example": "The teacher gave a goodbye at the end of the exam."
+          }
+        ]
+      }
+    };
+
+
+    // 修改函数定义，显式接收事件对象
+
+    function speakWord(event) {
+      if (!currentWord) return;
+      if (event) event.stopPropagation();
+
+      // 微信环境检测
+      const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+
+      if (isWeChat) {
+        // ▶️ 微信环境：播放本地音频文件
+        const audio = new Audio(`audio/${currentWord.word}.wav`);
+        audio.play().catch(err => {
+          alert('微信内需手动触发：点击后稍等重试');
+        });
+      } else {
+        // 💻 非微信环境：保留原有Web Speech API逻辑
+        if (!('speechSynthesis' in window)) {
+          alert("您的浏览器不支持语音朗读功能");
+          return;
+        }
+
+        if (voices.length === 0) {
+          alert("未找到可用语音引擎，请检查设备设置或安装语音包");
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(currentWord.word);
+        utterance.lang = 'en-US';
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+  </script>
+
+</head>
+
+<body>
+  <div class="stats">
+    <span id="progress">进度：0/0</span>
+  </div>
+
+  <!-- 原筛选面板修改为竖排结构 -->
+  <div class="filter-panel" id="filterPanel">
+    <div class="filter-column">
+      <div class="filter-group">
+        <label>教材版本：</label>
+        <select class="filter-select" id="textbookSelect" disabled>
+          <option>外研社一起点</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>年级：</label>
+        <div class="custom-select">
+          <div class="select-header" onclick="toggleDropdown('grade')">
+            <span id="gradeLabel">全选</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="select-options" id="gradeOptions">
+            <div class="select-all" onclick="selectAll('grade')">全选</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label>单元：</label>
+        <div class="custom-select">
+          <div class="select-header" onclick="toggleDropdown('module')">
+            <span id="moduleLabel">全选</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="select-options" id="moduleOptions">
+            <div class="select-all" onclick="selectAll('module')">全选</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="confirm-btn" onclick="applyFilters()">确认</button>
+    </div>
+  </div>
+
+  <!-- 修改选中信息为竖排 -->
+  <div class="selected-info" id="selectedInfo">
+    <div>教材版本：<span>外研社一起点</span></div>
+    <div class="selection-group">
+      <div>年级：</div>
+      <div id="selectedGradeList" class="selection-items"></div>
+    </div>
+    <div class="selection-group">
+      <div>单元：</div>
+      <div id="selectedModuleList" class="selection-items"></div>
+    </div>
+  </div>
+
+  <div class="flashcard-wrapper">
+    <div class="flashcard-container">
+      <div class="flashcard">
+        <div class="card-face front">
+          <button class="speaker-btn" onclick="speakWord(event)">🔊</button>
+          <span id="current-word">Loading...</span>
+        </div>
+        <div class="card-face back">
+          <div class="translation" id="translation"></div>
+          <div id="details"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="master-btn" onclick="markAsMastered()">已掌握</button>
+    <button class="next-btn" onclick="nextWord()">下一个</button>
+  </div>
+
+  <div class="manage-panel">
+    <button onclick="showMasteredWords()">管理已掌握单词</button>
+    <button onclick="clearAllProgress()" style="margin-top: 10px;">重置学习进度</button>
+  </div>
+
+  <div class="mastered-panel" id="masteredPanel">
+    <div class="panel-header">
+      <h3>已掌握单词（点击删除）</h3>
+      <button class="close-btn" onclick="closeMasteredPanel()">返回</button>
+    </div>
+    <div id="masteredList"></div>
+  </div>
+
+  <div class="privacy-notice">
+    <small>
+      📌 隐私说明：您的学习进度数据（已掌握单词）仅存储在本地设备中，不会上传至任何服务器。
+      清除浏览器缓存将删除这些数据，您也可以随时使用本页面的<a href="javascript:clearAllProgress()">重置学习进度</a>功能。
+    </small>
+  </div>
+
+  <div class="privacy-notice" id="voiceHint" style="display: none;">
+    <small>🔈 首次使用请点击任意单词卡或按钮以启用语音功能</small>
+  </div>
+
+  <script>
+    let selectedGrades = [];
+    let selectedModules = [];
+    const GRADE_LIST = ['一年级上', '一年级下', '二年级上', '二年级下', '三年级上', '三年级下', '四年级上', '四年级下', '五年级上', '五年级下', '六年级上', '六年级下'];
+    const MODULE_LIST = Array.from({ length: 10 }, (_, i) => `Module${i + 1}`);
+
+    let allWords = [];
+    let currentWord = null;
+    let masteredWords = JSON.parse(localStorage.getItem('masteredWords') || '[]');
+
+    // 初始化数据
+    function initFilters() {
+      // 初始化年级选项
+      const gradeOptions = document.getElementById('gradeOptions');
+      GRADE_LIST.forEach(grade => {
+        const div = document.createElement('div');
+        div.textContent = grade;
+        div.onclick = (e) => {
+          e.stopPropagation();
+          toggleSelect('grade', grade);
+        };
+        gradeOptions.appendChild(div);
+      });
+
+      // 初始化模块选项
+      const moduleOptions = document.getElementById('moduleOptions');
+      MODULE_LIST.forEach(module => {
+        const div = document.createElement('div');
+        div.textContent = module;
+        div.onclick = (e) => {
+          e.stopPropagation();
+          toggleSelect('module', module);
+        };
+        moduleOptions.appendChild(div);
+      });
+
+      // 非首次进入加载保存的筛选状态
+      const savedGrades = localStorage.getItem('selectedGrades');
+      const savedModules = localStorage.getItem('selectedModules');
+      if (savedGrades) selectedGrades = JSON.parse(savedGrades);
+      if (savedModules) selectedModules = JSON.parse(savedModules);
+      updateSelectedLabels();
+    }
+
+    // 在 initializeData 函数中添加语音引擎加载监听
+    function initializeData() {
+      try {
+        // ==== 核心数据初始化 ====
+        allWords = flattenData(embeddedWordData);
+        if (allWords.length === 0) throw new Error("词库为空");
+
+        // ==== 筛选器初始化 ====
+        initFilters(); // 动态生成年级和模块的下拉选项
+
+        // ==== 筛选状态恢复逻辑 ====
+        const hasSavedFilters =
+          localStorage.getItem('selectedGrades') !== null &&
+          localStorage.getItem('selectedModules') !== null;
+
+        if (hasSavedFilters) {
+          // 非首次进入：应用保存的筛选条件
+          selectedGrades = JSON.parse(localStorage.getItem('selectedGrades'));
+          selectedModules = JSON.parse(localStorage.getItem('selectedModules'));
+          applyFilters(); // 应用保存的筛选条件
+        } else {
+          // 首次进入或重置后：显示筛选面板
+          document.getElementById('filterPanel').style.display = 'block';
+          document.getElementById('selectedInfo').style.display = 'none';
+
+          // 强制重置选择状态
+          selectedGrades = [];
+          selectedModules = [];
+          updateSelectedLabels(); // 更新标签显示为"全选"
+        }
+
+        // ==== 更新进度和单词 ====
+        updateProgress();
+        nextWord();
+
+        // ==== 语音引擎初始化 ====
+        if ('speechSynthesis' in window) {
+          speechSynthesis.onvoiceschanged = () => {
+            console.log('可用语音列表:', speechSynthesis.getVoices());
+          };
+          // 触发引擎初始化
+          const dummyUtterance = new SpeechSynthesisUtterance('');
+          speechSynthesis.speak(dummyUtterance);
+          speechSynthesis.cancel();
+        }
+
+        // ▶️ 新增：预加载第一个单词的音频（提升首次点击响应速度）
+        if (/MicroMessenger/i.test(navigator.userAgent)) {
+          const preloadAudio = new Audio('audio/hello.wav');
+          preloadAudio.load();
+        }
+
+      } catch (error) {
+        // ==== 异常处理 ====
+        console.error('初始化失败:', error);
+        document.getElementById('current-word').textContent = "数据加载失败";
+
+        // 强制显示筛选面板
+        document.getElementById('filterPanel').style.display = 'block';
+        document.getElementById('selectedInfo').style.display = 'none';
+      }
+    }
+    // ==== 新增筛选逻辑函数 ====
+    function toggleDropdown(type) {
+      const options = document.getElementById(`${type}Options`);
+      options.style.display = options.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function selectAll(type) {
+      const list = type === 'grade' ? GRADE_LIST : MODULE_LIST;
+      const current = type === 'grade' ? selectedGrades : selectedModules;
+      current.splice(0); // 清空当前选择
+      list.forEach(item => current.push(item));
+      updateSelectedLabels();
+      // ==== 新增：全选后关闭下拉菜单 ====
+      document.getElementById(`${type}Options`).style.display = 'none';
+    }
+
+    function toggleSelect(type, value) {
+      const arr = type === 'grade' ? selectedGrades : selectedModules;
+      const index = arr.indexOf(value);
+      if (index === -1) {
+        arr.push(value);
+      } else {
+        arr.splice(index, 1);
+      }
+      updateSelectedLabels();
+
+      // ==== 新增：选中后关闭下拉菜单 ====
+      document.getElementById(`${type}Options`).style.display = 'none';
+    }
+
+    function updateSelectedLabels() {
+      // ==== 年级标签显示逻辑修改 ====
+      const gradeLabel = document.getElementById('gradeLabel');
+      gradeLabel.textContent = selectedGrades.length === GRADE_LIST.length
+        ? '全选'
+        : selectedGrades.length > 3
+          ? `已选${selectedGrades.length}个`
+          : selectedGrades.join(', ');
+
+      // ==== 单元标签显示逻辑修改 ====
+      const moduleLabel = document.getElementById('moduleLabel');
+      moduleLabel.textContent = selectedModules.length === MODULE_LIST.length
+        ? '全选'
+        : selectedModules.length > 3
+          ? `已选${selectedModules.length}个`
+          : selectedModules.join(', ');
+    }
+
+    function applyFilters() {
+      // ==== 新增：必须选择至少一个年级和模块 ====
+      if (selectedGrades.length === 0 || selectedModules.length === 0) {
+        alert("请至少选择一个年级和一个单元！");
+        return;
+      }
+      // ==== 控制界面显隐 ====
+      document.getElementById('filterPanel').style.display = 'none';
+      document.getElementById('selectedInfo').style.display = 'flex';
+
+      // ==== 保存筛选状态 ====
+      localStorage.setItem('selectedGrades', JSON.stringify(selectedGrades));
+      localStorage.setItem('selectedModules', JSON.stringify(selectedModules));
+
+      // 处理空状态（视为全选）
+      const finalGrades = selectedGrades.length > 0 ? selectedGrades : GRADE_LIST;
+      const finalModules = selectedModules.length > 0 ? selectedModules : MODULE_LIST;
+
+      // ==== 数据过滤 ====
+      allWords = flattenData(embeddedWordData).filter(word =>
+        finalGrades.includes(word.grade) &&
+        finalModules.includes(word.module)
+      );
+
+      // ==== 同步已掌握单词 ====
+      masteredWords = masteredWords.filter(word =>
+        allWords.some(w => w.word === word)
+      );
+      localStorage.setItem('masteredWords', JSON.stringify(masteredWords));
+
+      // ==== 更新进度和单词 ====
+      updateProgress();
+      nextWord();
+
+      // ==== 修改点：优化竖排展示逻辑 ==== 🔵 新增代码块
+      const formatDisplay = (list, fullText) => {
+        if (list.length === GRADE_LIST.length || list.length === MODULE_LIST.length) {
+          return `<span class="selected-item">${fullText}</span>`; // 全选时单行显示
+        } else {
+          // 竖排展示每个选项
+          return list.map(item => `<span class="selected-item">${item}</span>`).join('');
+        }
+      };
+
+      // 更新年级展示
+      document.getElementById('selectedGradeList').innerHTML =
+        formatDisplay(finalGrades, '全选'); // 修改为操作容器内容
+
+      // 更新单元展示
+      document.getElementById('selectedModuleList').innerHTML =
+        formatDisplay(finalModules, '全选'); // 修改为操作容器内容
+    }
+
+    function flattenData(data) {
+      return Object.entries(data).flatMap(([grade, modules]) =>
+        Object.entries(modules).flatMap(([module, words]) =>
+          words.map(word => ({
+            ...word,
+            grade,
+            module
+          }))
+        )
+      );
+    }
+
+    function getRandomWord() {
+      const availableWords = allWords.filter(word =>
+        !masteredWords.includes(word.word)
+      );
+      return availableWords[Math.floor(Math.random() * availableWords.length)];
+    }
+
+    function updateCard(word) {
+      currentWord = word;
+      document.getElementById('current-word').textContent = word.word;
+      document.getElementById('translation').textContent = word.translation;
+      document.getElementById('details').innerHTML = `
+                <p>年级：${word.grade}｜单元：${word.module}</p>
+                <p style="margin-top:15px;color:#666">${word.example}</p>
+            `;
+      adjustFontSize();
+    }
+
+    function nextWord() {
+      const word = getRandomWord();
+      if (!word) return alert("所有单词已学习完成！");
+      document.querySelector('.flashcard').classList.remove('flipped');
+      setTimeout(() => updateCard(word), 300);
+    }
+
+    function markAsMastered() {
+      if (!currentWord) return;
+      const flashcard = document.querySelector('.flashcard');
+      const isFront = !flashcard.classList.contains('flipped');
+
+      if (isFront) {
+        flashcard.classList.add('flipped');
+        setTimeout(() => {
+          if (!masteredWords.includes(currentWord.word)) {
+            masteredWords.push(currentWord.word);
+            localStorage.setItem('masteredWords', JSON.stringify(masteredWords));
+            updateProgress();
+          }
+          nextWord();
+        }, 3000);
+      } else {
+        if (!masteredWords.includes(currentWord.word)) {
+          masteredWords.push(currentWord.word);
+          localStorage.setItem('masteredWords', JSON.stringify(masteredWords));
+          updateProgress();
+        }
+        nextWord();
+      }
+    }
+
+    function updateProgress() {
+      document.getElementById('progress').textContent =
+        `进度：${masteredWords.length}/${allWords.length}`;
+    }
+
+    function showMasteredWords() {
+      document.getElementById('masteredPanel').classList.add('active');
+      const listContainer = document.getElementById('masteredList');
+      listContainer.innerHTML = masteredWords.map(wordStr => {
+        const wordData = allWords.find(w => w.word === wordStr);
+        return `
+                    <div class="mastered-item" onclick="handleMasteredWord('${wordStr}')">
+                        <div>${wordStr}</div>
+                        <div style="font-size:0.9em;color:#666">${wordData?.translation || '翻译未找到'}</div>
+                        <span class="delete-btn" onclick="removeMasteredWord('${wordStr}')">× 删除</span>
+                    </div>
+                `;
+      }).join('');
+    }
+
+    function closeMasteredPanel() {
+      document.getElementById('masteredPanel').classList.remove('active');
+    }
+
+    function removeMasteredWord(word) {
+      event.stopPropagation();
+      masteredWords = masteredWords.filter(w => w !== word);
+      localStorage.setItem('masteredWords', JSON.stringify(masteredWords));
+      updateProgress();
+      showMasteredWords();
+    }
+
+    function handleMasteredWord(word) {
+      const items = document.querySelectorAll('.mastered-item');
+      items.forEach(item => item.style.background = 'transparent');
+      event.currentTarget.style.background = '#f5f5f5';
+    }
+
+    function clearAllProgress() {
+      if (confirm("确认要重置所有学习进度吗？")) {
+        // ==== 核心修改：完全重置状态 ====
+        // 1. 清空已掌握单词
+        masteredWords = [];
+        localStorage.removeItem('masteredWords');
+
+        // 2. 重置筛选状态（改为空数组）
+        selectedGrades = [];
+        selectedModules = [];
+        localStorage.removeItem('selectedGrades');
+        localStorage.removeItem('selectedModules');
+
+        // ==== 新增：强制显示筛选面板并隐藏信息 ====
+        document.getElementById('filterPanel').style.display = 'block';
+        document.getElementById('selectedInfo').style.display = 'none';
+
+        // 3. 重置标签显示为"全选"
+        document.getElementById('gradeLabel').textContent = '全选';
+        document.getElementById('moduleLabel').textContent = '全选';
+
+        // 4. 重新初始化数据（而不是调用applyFilters）
+        allWords = flattenData(embeddedWordData);
+        updateProgress();
+        nextWord();
+      }
+    }
+    function adjustFontSize() {
+      const elements = [document.getElementById('current-word'), document.getElementById('translation')];
+      elements.forEach(el => {
+        if (!el) return;
+        let fontSize = parseInt(window.getComputedStyle(el).fontSize);
+        while (el.scrollHeight > el.offsetHeight && fontSize > 20) {
+          fontSize--;
+          el.style.fontSize = fontSize + 'px';
+        }
+      });
+    }
+
+    // 事件监听
+    document.querySelector('.flashcard').addEventListener('click', (e) => {
+      if (
+        e.target.closest('button') ||
+        e.target.closest('.translation') ||
+        e.target.closest('#details') ||
+        e.target.closest('.speaker-btn') // 新增排除喇叭按钮
+      ) return;
+      document.querySelector('.flashcard').classList.toggle('flipped');
+    });
+
+    // ===== 原代码中的事件监听 =====
+    document.addEventListener('click', (e) => {
+      // 原有逻辑：关闭已掌握面板
+      if (!e.target.closest('.mastered-panel') &&
+        !e.target.closest('.manage-panel button')) {
+        closeMasteredPanel();
+      }
+
+      // ==== 新增逻辑：关闭所有下拉菜单 ====
+      if (!e.target.closest('.custom-select')) { // 如果点击不在下拉组件内
+        document.querySelectorAll('.select-options').forEach(el => {
+          el.style.display = 'none';
+        });
+      }
+    });
+
+    // 手势支持
+    let touchStartX = 0;
+    const flashcard = document.querySelector('.flashcard');
+    flashcard.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+    });
+    flashcard.addEventListener('touchend', e => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diffX = touchEndX - touchStartX;
+      if (Math.abs(diffX) > 50) {
+        flashcard.classList.toggle('flipped');
+      }
+    });
+
+    // 用户首次点击页面时隐藏提示
+    document.addEventListener('click', () => {
+      document.getElementById('voiceHint').style.display = 'none';
+    }, { once: true });
+
+    // 初始化时显示提示（仅移动端）
+    if (/Mobi|Android/i.test(navigator.userAgent)) {
+      document.getElementById('voiceHint').style.display = 'block';
+    }
+
+    window.addEventListener('resize', adjustFontSize);
+    window.addEventListener('load', initializeData);
+  </script>
+</body>
+
+</html>
