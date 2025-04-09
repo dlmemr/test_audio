@@ -561,36 +561,40 @@
 
     // 修改函数定义，显式接收事件对象
 
+    // 在全局添加语音列表变量
+    let voices = [];
+
     function speakWord(event) {
       if (!currentWord) return;
       if (event) event.stopPropagation();
 
-      // 微信环境检测
-      const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+      // 微信环境检测...
 
-      if (isWeChat) {
-        // ▶️ 微信环境：播放本地音频文件
-        const audio = new Audio(`audio/${currentWord.word}.wav`);
-        audio.play().catch(err => {
-          alert('微信内需手动触发：点击后稍等重试');
-        });
-      } else {
-        // 💻 非微信环境：保留原有Web Speech API逻辑
-        if (!('speechSynthesis' in window)) {
-          alert("您的浏览器不支持语音朗读功能");
-          return;
-        }
-
-        if (voices.length === 0) {
-          alert("未找到可用语音引擎，请检查设备设置或安装语音包");
-          return;
-        }
-        const utterance = new SpeechSynthesisUtterance(currentWord.word);
-        utterance.lang = 'en-US';
-        speechSynthesis.speak(utterance);
+      // 💻 非微信环境
+      if (!('speechSynthesis' in window)) {
+        alert("您的浏览器不支持语音朗读功能");
+        return;
       }
-    }
 
+      // 获取更新后的语音列表
+      voices = speechSynthesis.getVoices();
+
+      if (voices.length === 0) {
+        alert("语音引擎正在加载，请稍后再试");
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(currentWord.word);
+      utterance.lang = 'en-US';
+
+      // 添加错误处理
+      utterance.onerror = (event) => {
+        console.error('语音播放失败:', event.error);
+        alert("语音播放失败，请检查语音引擎设置");
+      };
+
+      speechSynthesis.speak(utterance);
+    }
   </script>
 
 </head>
@@ -778,13 +782,20 @@
 
         // ==== 语音引擎初始化 ====
         if ('speechSynthesis' in window) {
+          // 添加语音列表加载监听
           speechSynthesis.onvoiceschanged = () => {
-            console.log('可用语音列表:', speechSynthesis.getVoices());
+            voices = speechSynthesis.getVoices();
+            console.log('语音列表已更新:', voices);
+
+            // 自动选择英语语音
+            const enVoice = voices.find(v => v.lang.startsWith('en-'));
+            if (enVoice) {
+              console.log('已找到英语语音引擎:', enVoice.name);
+            }
           };
-          // 触发引擎初始化
-          const dummyUtterance = new SpeechSynthesisUtterance('');
-          speechSynthesis.speak(dummyUtterance);
-          speechSynthesis.cancel();
+
+          // 立即获取语音列表
+          voices = speechSynthesis.getVoices();
         }
 
         // ▶️ 新增：预加载第一个单词的音频（提升首次点击响应速度）
