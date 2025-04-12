@@ -563,6 +563,7 @@
 
     // 在全局添加语音列表变量
     let voices = [];
+    let wechatAudioEnabled = false; // 标记是否已通过首次授权
 
     function speakWord(event) {
       // 1. 基础检查
@@ -580,93 +581,104 @@
       if (isWeChat) {
         console.log('WeChat environment: using audio fallback');
         const audio = new Audio(`audio/${currentWord.word}.wav`);
+
+        // 已授权直接播放
+        if (wechatAudioEnabled) {
+          audio.play();
+          return;
+        }
+
+
         audio.play().catch(err => {
           console.error('Audio play failed:', err);
-          alert('微信内需手动触发：点击后稍等重试');
+          alert('首次播放需授权');
+
+          // 显示固定提示文字（非弹窗）
+          const hint = document.createElement('div');
+          hint.innerHTML = '🔈 首次使用需再次点击喇叭';
+          hint.style.position = 'fixed';
+          hint.style.bottom = '100px';
+          hint.style.color = 'red';
+          document.body.appendChild(hint);
+
+          // 标记授权状态
+          document.querySelector('.speaker-btn').onclick = () => {
+            wechatAudioEnabled = true;
+            document.body.removeChild(hint);
+            audio.play();
+          };
         });
         return;
       }
 
       // 3. 非微信环境主逻辑
       console.log('Non-WeChat environment: using speechSynthesis');
+
+      // 定义音频回退方法
+      const playFallbackAudio = () => {
+        console.log('Fallback to audio playback');
+        const audio = new Audio(`audio/${currentWord.word}.wav`);
+        audio.play().catch(console.error);
+      };
+
+      // 浏览器支持性检查
       if (!('speechSynthesis' in window)) {
-        const msg = "您的浏览器不支持语音朗读功能";
-        console.error(msg);
-        alert(msg);
+        console.error('Browser does not support speech synthesis');
+        playFallbackAudio();
         return;
       }
 
-      // 4. 语音引擎处理（核心修复部分）
+      // 4. 语音引擎处理
       const speakWithVoice = (voice) => {
-        // 清除队列避免阻塞
         speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(currentWord.word);
         utterance.lang = 'en-US';
         utterance.voice = voice;
 
-        // 调试事件
-        utterance.onstart = () => console.log('Speech STARTED');
-        utterance.onend = () => console.log('Speech ENDED');
+        // 错误处理
         utterance.onerror = (e) => {
-          console.error('Speech ERROR:', e.name, e.message);
-          //alert(`语音播放失败: ${e.message}`);
+          console.error('Speech error:', e.name);
+          playFallbackAudio();
         };
-        utterance.onboundary = (e) => console.debug('Boundary:', e.charIndex, e.name);
 
-        console.log('Speaking with voice:', voice ? voice.name : 'default');
-        speechSynthesis.speak(utterance);
-
-        // 状态检查
-        setTimeout(() => {
-          console.log('Speech state:', {
-            pending: speechSynthesis.pending,
-            speaking: speechSynthesis.speaking,
-            paused: speechSynthesis.paused
-          });
-        }, 100);
+        try {
+          speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.error('Speak failed:', e);
+          playFallbackAudio();
+        }
       };
 
       // 5. 语音选择逻辑
       const handleVoices = () => {
         const voices = speechSynthesis.getVoices();
-        console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+        console.log('Available voices:', voices);
 
-        // 优先选择Google英语引擎
-        const enVoice = voices.find(v =>
-          v.lang.startsWith('en-') &&
-          (v.name.includes('Google') || v.name.includes('English'))
-        ) || voices.find(v => v.lang.startsWith('en-'));
+        // 语音筛选逻辑
+        const enVoice = voices.find(v => v.lang.startsWith('en-')) || voices[0];
 
         if (enVoice) {
-          console.log('Selected voice:', enVoice.name);
           speakWithVoice(enVoice);
-        } else if (voices.length > 0) {
-          console.warn('No English voice, falling back to first available');
-          speakWithVoice(voices[0]);
         } else {
-          console.error('No voices available');
-          alert('未找到可用的语音引擎');
+          console.error('No available voices');
+          playFallbackAudio();
         }
       };
 
       // 6. 初始化语音引擎
-      const initialVoices = speechSynthesis.getVoices();
-      if (initialVoices.length > 0) {
-        console.log('Voices pre-loaded');
+      if (speechSynthesis.getVoices().length > 0) {
         handleVoices();
       } else {
-        console.log('Waiting for voices...');
         speechSynthesis.onvoiceschanged = () => {
-          console.log('voiceschanged event fired');
-          speechSynthesis.onvoiceschanged = null; // 防止重复触发
+          speechSynthesis.onvoiceschanged = null;
           handleVoices();
         };
 
         // 超时回退
         setTimeout(() => {
-          if (speechSynthesis.pending) {
-            console.warn('Voice load timeout, attempting anyway');
+          if (!speechSynthesis.speaking) {
+            console.warn('Voice loading timeout');
             handleVoices();
           }
         }, 2000);
@@ -1021,6 +1033,11 @@
                 <p style="margin-top:15px;color:#666">${word.example}</p>
             `;
       adjustFontSize();
+      // 🔥 预加载新单词音频
+      if (/MicroMessenger/i.test(navigator.userAgent)) {
+        const audio = new Audio(`audio/${word.word}.wav`);
+        audio.load();
+      }
     }
 
     function nextWord() {
