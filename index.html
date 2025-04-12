@@ -976,7 +976,7 @@
             updateProgress();
           }
           nextWord();
-        }, 3000);
+        }, 2000);
       } else {
         if (!masteredWords.includes(currentWord.word)) {
           masteredWords.push(currentWord.word);
@@ -995,7 +995,7 @@
     function showMasteredWords() {
       document.getElementById('masteredPanel').classList.add('active');
       const listContainer = document.getElementById('masteredList');
-      listContainer.innerHTML = masteredWords.map(wordStr => {
+      listContainer.innerHTML = [...masteredWords].reverse().map(wordStr => { // 新增reverse()
         const wordData = allWords.find(w => w.word === wordStr);
         return `
                     <div class="mastered-item" onclick="handleMasteredWord('${wordStr}')">
