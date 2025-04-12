@@ -565,58 +565,90 @@
     let voices = [];
 
     function speakWord(event) {
-      if (!currentWord) return;
+      if (!currentWord) {
+        console.error('speakWord: currentWord is undefined');
+        return;
+      }
       if (event) event.stopPropagation();
+
+      console.log('speakWord: Attempting to speak:', currentWord.word);
+      console.log('UserAgent:', navigator.userAgent);
 
       // 微信环境检测
       const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+      console.log('isWeChat:', isWeChat);
 
       if (isWeChat) {
-        // ▶️ 微信环境：播放本地音频文件
+        console.log('WeChat environment detected');
         const audio = new Audio(`audio/${currentWord.word}.wav`);
         audio.play().catch(err => {
+          console.error('WeChat audio play failed:', err);
           alert('微信内需手动触发：点击后稍等重试');
         });
       } else {
-        // 非微信环境
+        console.log('Non-WeChat environment');
         if (!('speechSynthesis' in window)) {
-          alert("您的浏览器不支持语音朗读功能");
+          const msg = "您的浏览器不支持语音朗读功能";
+          console.error(msg);
+          alert(msg);
           return;
         }
 
-        // 🔥 关键修复：确保语音列表已加载
+        console.log('SpeechSynthesis supported. Getting voices...');
         const updateVoices = () => {
           voices = speechSynthesis.getVoices();
-          if (voices.length === 0) return;
+          console.log('Available voices:', voices);
 
-          // 移除监听避免重复触发
+          if (voices.length === 0) {
+            console.warn('No voices available after voiceschanged event');
+            return;
+          }
+
           speechSynthesis.removeEventListener('voiceschanged', updateVoices);
 
           const utterance = new SpeechSynthesisUtterance(currentWord.word);
           utterance.lang = 'en-US';
+          console.log('Utterance created:', utterance);
 
           // 自动选择英语语音
           const enVoice = voices.find(v => v.lang.startsWith('en-'));
-          if (enVoice) utterance.voice = enVoice;
+          if (enVoice) {
+            console.log('Using English voice:', enVoice.name);
+            utterance.voice = enVoice;
+          } else {
+            console.warn('No English voice found, using default');
+          }
 
-          // 错误处理
           utterance.onerror = (e) => {
-            console.error('语音播放失败:', e.error);
-            alert("语音播放失败，请检查浏览器设置");
+            console.error('Speech synthesis error:', e.error, 'Event:', e);
+            alert("语音播放失败，请检查语音引擎设置");
           };
 
+          utterance.onend = () => {
+            console.log('Speech finished');
+          };
+
+          utterance.onstart = () => {
+            console.log('Speech started');
+          };
+
+          console.log('Attempting to speak...');
           speechSynthesis.speak(utterance);
+          console.log('speak() called, synthesis state:', speechSynthesis.pending ? 'pending' : 'not pending');
         };
 
-        // 如果语音列表未加载，监听事件
-        if (speechSynthesis.getVoices().length === 0) {
+        const initialVoices = speechSynthesis.getVoices();
+        console.log('Initial voices:', initialVoices);
+
+        if (initialVoices.length === 0) {
+          console.log('No initial voices, waiting for voiceschanged event');
           speechSynthesis.addEventListener('voiceschanged', updateVoices);
         } else {
+          console.log('Voices already available, proceeding directly');
           updateVoices();
         }
       }
     }
-
   </script>
 
 </head>
