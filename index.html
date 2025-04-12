@@ -610,7 +610,7 @@
         utterance.onend = () => console.log('Speech ENDED');
         utterance.onerror = (e) => {
           console.error('Speech ERROR:', e.name, e.message);
-          alert(`语音播放失败: ${e.message}`);
+          //alert(`语音播放失败: ${e.message}`);
         };
         utterance.onboundary = (e) => console.debug('Boundary:', e.charIndex, e.name);
 
