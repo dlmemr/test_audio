@@ -565,6 +565,7 @@
     let voices = [];
 
     function speakWord(event) {
+      // 1. 基础检查
       if (!currentWord) {
         console.error('speakWord: currentWord is undefined');
         return;
@@ -572,83 +573,106 @@
       if (event) event.stopPropagation();
 
       console.log('speakWord: Attempting to speak:', currentWord.word);
-      console.log('UserAgent:', navigator.userAgent);
+      console.log('Browser:', navigator.userAgent);
 
-      // 微信环境检测
+      // 2. 微信环境处理
       const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
-      console.log('isWeChat:', isWeChat);
-
       if (isWeChat) {
-        console.log('WeChat environment detected');
+        console.log('WeChat environment: using audio fallback');
         const audio = new Audio(`audio/${currentWord.word}.wav`);
         audio.play().catch(err => {
-          console.error('WeChat audio play failed:', err);
+          console.error('Audio play failed:', err);
           alert('微信内需手动触发：点击后稍等重试');
         });
-      } else {
-        console.log('Non-WeChat environment');
-        if (!('speechSynthesis' in window)) {
-          const msg = "您的浏览器不支持语音朗读功能";
-          console.error(msg);
-          alert(msg);
-          return;
+        return;
+      }
+
+      // 3. 非微信环境主逻辑
+      console.log('Non-WeChat environment: using speechSynthesis');
+      if (!('speechSynthesis' in window)) {
+        const msg = "您的浏览器不支持语音朗读功能";
+        console.error(msg);
+        alert(msg);
+        return;
+      }
+
+      // 4. 语音引擎处理（核心修复部分）
+      const speakWithVoice = (voice) => {
+        // 清除队列避免阻塞
+        speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(currentWord.word);
+        utterance.lang = 'en-US';
+        utterance.voice = voice;
+
+        // 调试事件
+        utterance.onstart = () => console.log('Speech STARTED');
+        utterance.onend = () => console.log('Speech ENDED');
+        utterance.onerror = (e) => {
+          console.error('Speech ERROR:', e.name, e.message);
+          alert(`语音播放失败: ${e.message}`);
+        };
+        utterance.onboundary = (e) => console.debug('Boundary:', e.charIndex, e.name);
+
+        console.log('Speaking with voice:', voice ? voice.name : 'default');
+        speechSynthesis.speak(utterance);
+
+        // 状态检查
+        setTimeout(() => {
+          console.log('Speech state:', {
+            pending: speechSynthesis.pending,
+            speaking: speechSynthesis.speaking,
+            paused: speechSynthesis.paused
+          });
+        }, 100);
+      };
+
+      // 5. 语音选择逻辑
+      const handleVoices = () => {
+        const voices = speechSynthesis.getVoices();
+        console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+
+        // 优先选择Google英语引擎
+        const enVoice = voices.find(v =>
+          v.lang.startsWith('en-') &&
+          (v.name.includes('Google') || v.name.includes('English'))
+        ) || voices.find(v => v.lang.startsWith('en-'));
+
+        if (enVoice) {
+          console.log('Selected voice:', enVoice.name);
+          speakWithVoice(enVoice);
+        } else if (voices.length > 0) {
+          console.warn('No English voice, falling back to first available');
+          speakWithVoice(voices[0]);
+        } else {
+          console.error('No voices available');
+          alert('未找到可用的语音引擎');
         }
+      };
 
-        console.log('SpeechSynthesis supported. Getting voices...');
-        const updateVoices = () => {
-          voices = speechSynthesis.getVoices();
-          console.log('Available voices:', voices);
-
-          if (voices.length === 0) {
-            console.warn('No voices available after voiceschanged event');
-            return;
-          }
-
-          speechSynthesis.removeEventListener('voiceschanged', updateVoices);
-
-          const utterance = new SpeechSynthesisUtterance(currentWord.word);
-          utterance.lang = 'en-US';
-          console.log('Utterance created:', utterance);
-
-          // 自动选择英语语音
-          const enVoice = voices.find(v => v.lang.startsWith('en-'));
-          if (enVoice) {
-            console.log('Using English voice:', enVoice.name);
-            utterance.voice = enVoice;
-          } else {
-            console.warn('No English voice found, using default');
-          }
-
-          utterance.onerror = (e) => {
-            console.error('Speech synthesis error:', e.error, 'Event:', e);
-            alert("语音播放失败，请检查语音引擎设置");
-          };
-
-          utterance.onend = () => {
-            console.log('Speech finished');
-          };
-
-          utterance.onstart = () => {
-            console.log('Speech started');
-          };
-
-          console.log('Attempting to speak...');
-          speechSynthesis.speak(utterance);
-          console.log('speak() called, synthesis state:', speechSynthesis.pending ? 'pending' : 'not pending');
+      // 6. 初始化语音引擎
+      const initialVoices = speechSynthesis.getVoices();
+      if (initialVoices.length > 0) {
+        console.log('Voices pre-loaded');
+        handleVoices();
+      } else {
+        console.log('Waiting for voices...');
+        speechSynthesis.onvoiceschanged = () => {
+          console.log('voiceschanged event fired');
+          speechSynthesis.onvoiceschanged = null; // 防止重复触发
+          handleVoices();
         };
 
-        const initialVoices = speechSynthesis.getVoices();
-        console.log('Initial voices:', initialVoices);
-
-        if (initialVoices.length === 0) {
-          console.log('No initial voices, waiting for voiceschanged event');
-          speechSynthesis.addEventListener('voiceschanged', updateVoices);
-        } else {
-          console.log('Voices already available, proceeding directly');
-          updateVoices();
-        }
+        // 超时回退
+        setTimeout(() => {
+          if (speechSynthesis.pending) {
+            console.warn('Voice load timeout, attempting anyway');
+            handleVoices();
+          }
+        }, 2000);
       }
     }
+
   </script>
 
 </head>
