@@ -640,21 +640,20 @@
       // 定义音频回退方法
       const playFallbackAudio = () => {
         console.log('Fallback to audio playback');
-        //const audio = new Audio(`audio/${currentWord.word.trim().toLowerCase()}.wav`);
-        const playFallbackAudio = () => {
-          console.log('Fallback to audio playback');
-          const processedName = getProcessedFileName(currentWord.word);
-          const audio = new Audio(`audio/${processedName}.wav`);
+        const processedName = getProcessedFileName(currentWord.word);
+        const audio = new Audio(`audio/${processedName}.wav`);
 
-          audio.onerror = () => {
-            logAudioError('fallback_audio_load', currentWord.word, `${processedName}.wav`);
-          };
+        audio.onerror = () => {
+          logAudioError('fallback_audio_load', currentWord.word, `${processedName}.wav`);
+        };
 
+        // 添加用户交互后播放
+        document.body.addEventListener('click', function handler() {
           audio.play().catch(err => {
             logAudioError('fallback_audio_play', currentWord.word, `${processedName}.wav`, err.message);
           });
-        };
-        audio.play().catch(console.error);
+          document.body.removeEventListener('click', handler);
+        }, { once: true });
       };
 
       // 浏览器支持性检查
@@ -682,7 +681,7 @@
           speechSynthesis.speak(utterance);
         } catch (e) {
           console.error('Speak failed:', e);
-          playFallbackAudio();
+          setTimeout(playFallbackAudio, 100); // 延迟执行确保上下文
         }
       };
 
@@ -897,8 +896,8 @@
           document.getElementById('selectedInfo').style.display = 'none';
 
           // 强制重置选择状态
-          selectedGrades = [];
-          selectedModules = [];
+          selectedGrades = [...GRADE_LIST]; // 默认全选
+          selectedModules = [...MODULE_LIST]; // 默认全选
           updateSelectedLabels(); // 更新标签显示为"全选"
         }
 
@@ -990,10 +989,8 @@
 
     function applyFilters() {
       // ==== 新增：必须选择至少一个年级和模块 ====
-      if (selectedGrades.length === 0 || selectedModules.length === 0) {
-        alert("请至少选择一个年级和一个单元！");
-        return;
-      }
+      if (selectedGrades.length === 0) selectedGrades = [...GRADE_LIST];
+      if (selectedModules.length === 0) selectedModules = [...MODULE_LIST];
       // ==== 控制界面显隐 ====
       document.getElementById('filterPanel').style.display = 'none';
       document.getElementById('selectedInfo').style.display = 'flex';
@@ -1160,8 +1157,8 @@
         localStorage.removeItem('masteredWords');
 
         // 2. 重置筛选状态（改为空数组）
-        selectedGrades = [];
-        selectedModules = [];
+        selectedGrades = [...GRADE_LIST]; // 默认全选
+        selectedModules = [...MODULE_LIST]; // 默认全选
         localStorage.removeItem('selectedGrades');
         localStorage.removeItem('selectedModules');
 
