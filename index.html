@@ -6,13 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>智能单词闪卡系统</title>
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MMDS83C307"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XBNC1T6KV"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
 
-    gtag('config', 'G-MMDS83C307');
+    gtag('config', 'G-7XBNC1T6KV');
   </script>
 
   <style>
@@ -558,6 +558,19 @@
       }
     };
 
+    // ==== 新增文件名处理和日志函数 ====
+    function getProcessedFileName(word) {
+      return word.trim().toLowerCase();
+    }
+
+    function logAudioError(errorType, word, filename, errorMsg = '') {
+      const timestamp = new Date().toISOString();
+      console.error(`[Audio Error] ${timestamp}
+                      Type: ${errorType}
+                      Word: "${word}"
+                      Filename: ${filename}
+                      ${errorMsg ? 'Error: ' + errorMsg : ''}`);
+    }
 
     // 修改函数定义，显式接收事件对象
 
@@ -580,11 +593,21 @@
       const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
       if (isWeChat) {
         console.log('WeChat environment: using audio fallback');
-        const audio = new Audio(`audio/${currentWord.word}.wav`);
+        //const audio = new Audio(`audio/${currentWord.word.trim().toLowerCase()}.wav`);
+
+        // ==== 修改开始 ====
+        const processedName = getProcessedFileName(currentWord.word);
+        const audio = new Audio(`audio/${processedName}.wav`);
+
+        audio.onerror = () => {
+          logAudioError('wechat_audio_load', currentWord.word, `${processedName}.wav`);
+        };
 
         // 已授权直接播放
         if (wechatAudioEnabled) {
-          audio.play();
+          audio.play().catch(err => {
+            logAudioError('wechat_audio_play', currentWord.word, `${processedName}.wav`, err.message);
+          });
           return;
         }
 
@@ -617,7 +640,20 @@
       // 定义音频回退方法
       const playFallbackAudio = () => {
         console.log('Fallback to audio playback');
-        const audio = new Audio(`audio/${currentWord.word}.wav`);
+        //const audio = new Audio(`audio/${currentWord.word.trim().toLowerCase()}.wav`);
+        const playFallbackAudio = () => {
+          console.log('Fallback to audio playback');
+          const processedName = getProcessedFileName(currentWord.word);
+          const audio = new Audio(`audio/${processedName}.wav`);
+
+          audio.onerror = () => {
+            logAudioError('fallback_audio_load', currentWord.word, `${processedName}.wav`);
+          };
+
+          audio.play().catch(err => {
+            logAudioError('fallback_audio_play', currentWord.word, `${processedName}.wav`, err.message);
+          });
+        };
         audio.play().catch(console.error);
       };
 
@@ -1011,7 +1047,8 @@
           words.map(word => ({
             ...word,
             grade,
-            module
+            module,
+            audio: getProcessedFileName(word.word) // 新增预处理字段
           }))
         )
       );
@@ -1035,7 +1072,12 @@
       adjustFontSize();
       // 🔥 预加载新单词音频
       if (/MicroMessenger/i.test(navigator.userAgent)) {
-        const audio = new Audio(`audio/${word.word}.wav`);
+        //const audio = new Audio(`audio/${word.word.trim().toLowerCase()}.wav`);
+        const processedName = getProcessedFileName(word.word);
+        const audio = new Audio(`audio/${processedName}.wav`);
+        audio.onerror = () => {
+          logAudioError('preload_audio_fail', word.word, `${processedName}.wav`);
+        };
         audio.load();
       }
     }
