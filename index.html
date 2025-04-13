@@ -638,23 +638,52 @@
       console.log('Non-WeChat environment: using speechSynthesis');
 
       // 定义音频回退方法
+      // 在speakWord函数中找到以下代码段：
       const playFallbackAudio = () => {
         console.log('Fallback to audio playback');
         const processedName = getProcessedFileName(currentWord.word);
         const audio = new Audio(`audio/${processedName}.wav`);
 
+        // ==== 修改开始 ====
         audio.onerror = () => {
           logAudioError('fallback_audio_load', currentWord.word, `${processedName}.wav`);
         };
 
-        // 添加用户交互后播放
-        document.body.addEventListener('click', function handler() {
-          audio.play().catch(err => {
-            logAudioError('fallback_audio_play', currentWord.word, `${processedName}.wav`, err.message);
-          });
-          document.body.removeEventListener('click', handler);
-        }, { once: true });
+        // 立即尝试播放
+        audio.play().catch(err => {
+          logAudioError('fallback_audio_play_init', currentWord.word, `${processedName}.wav`, err.message);
+
+          // 创建提示元素
+          const hint = document.createElement('div');
+          hint.innerHTML = '🔈 请点击屏幕任意位置启用声音';
+          hint.style.cssText = `
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.9);
+      padding: 10px 20px;
+      border-radius: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 999;
+      color: #f44336;
+    `;
+          document.body.appendChild(hint);
+
+          // 添加页面点击监听
+          const handleUserInteraction = () => {
+            document.body.removeChild(hint);
+            audio.play().catch(e => {
+              logAudioError('fallback_audio_play_retry', currentWord.word, `${processedName}.wav`, e.message);
+            });
+            document.body.removeEventListener('click', handleUserInteraction);
+          };
+
+          document.body.addEventListener('click', handleUserInteraction, { once: true });
+        });
+        // ==== 修改结束 ====
       };
+
 
       // 浏览器支持性检查
       if (!('speechSynthesis' in window)) {
