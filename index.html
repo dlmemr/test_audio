@@ -9267,6 +9267,16 @@
         // ==== 核心数据初始化 ====
         allWords = flattenData(embeddedWordData);
         if (allWords.length === 0) throw new Error("词库为空");
+        // 强制初始化筛选器状态（新增逻辑）
+        if (!localStorage.getItem('selectedGrades')) {
+          selectedGrades = [...GRADE_LIST];
+          selectedModules = [...MODULE_LIST];
+          localStorage.setItem('selectedGrades', JSON.stringify(selectedGrades));
+          localStorage.setItem('selectedModules', JSON.stringify(selectedModules));
+        }
+
+        // 更新标签状态
+        updateSelectedLabels();
 
         // ==== 筛选器初始化 ====
         initFilters(); // 动态生成年级和模块的下拉选项
@@ -9339,96 +9349,116 @@
     function selectAll(type) {
       const list = type === 'grade' ? GRADE_LIST : MODULE_LIST;
       const current = type === 'grade' ? selectedGrades : selectedModules;
-      current.splice(0); // 清空当前选择
-      list.forEach(item => current.push(item));
+
+      // 判断当前是否已全选
+      const isAllSelected = current.length === list.length;
+
+      if (isAllSelected) {
+        // 取消全选
+        current.splice(0, current.length);
+      } else {
+        // 设置全选（使用解构赋值避免引用问题）
+        current.splice(0, current.length, ...list);
+      }
+
+      // 更新下拉菜单全选按钮文本
+      const allButton = document.getElementById(`${type}Options`).querySelector('.select-all');
+      allButton.textContent = current.length === list.length ? '取消全选' : '全选';
+
       updateSelectedLabels();
-      // ==== 新增：全选后关闭下拉菜单 ====
       document.getElementById(`${type}Options`).style.display = 'none';
     }
 
+    // 修改 toggleSelect 函数
     function toggleSelect(type, value) {
       const arr = type === 'grade' ? selectedGrades : selectedModules;
+      const fullList = type === 'grade' ? GRADE_LIST : MODULE_LIST;
+
+      // 处理普通选项
       const index = arr.indexOf(value);
+
+      // ==== 新增逻辑 ====
+      // 如果当前是全选状态，先清空数组
+      if (arr.length === fullList.length) {
+        arr.splice(0, arr.length);
+      }
+
       if (index === -1) {
         arr.push(value);
       } else {
         arr.splice(index, 1);
       }
-      updateSelectedLabels();
 
-      // ==== 新增：选中后关闭下拉菜单 ====
+      // ==== 修改全选判断逻辑 ====
+      const allButton = document.getElementById(`${type}Options`).querySelector('.select-all');
+      const isAllSelected = arr.length === fullList.length;
+
+      // 自动处理全选状态
+      if (arr.length === 0) {
+        arr.push(...fullList); // 空选择时保持全选
+        allButton.textContent = '取消全选';
+      } else {
+        allButton.textContent = isAllSelected ? '取消全选' : '全选';
+      }
+
+      updateSelectedLabels();
       document.getElementById(`${type}Options`).style.display = 'none';
     }
 
+    // 修改 updateSelectedLabels 函数
     function updateSelectedLabels() {
       // ==== 年级标签显示逻辑修改 ====
       const gradeLabel = document.getElementById('gradeLabel');
-      gradeLabel.textContent = selectedGrades.length === GRADE_LIST.length
-        ? '全选'
-        : selectedGrades.length > 3
-          ? `已选${selectedGrades.length}个`
-          : selectedGrades.join(', ');
+      gradeLabel.textContent = selectedGrades.length === GRADE_LIST.length ?
+        '全选' :
+        selectedGrades.join(', '); // 直接显示选中项
 
       // ==== 单元标签显示逻辑修改 ====
       const moduleLabel = document.getElementById('moduleLabel');
-      moduleLabel.textContent = selectedModules.length === MODULE_LIST.length
-        ? '全选'
-        : selectedModules.length > 3
-          ? `已选${selectedModules.length}个`
-          : selectedModules.join(', ');
+      moduleLabel.textContent = selectedModules.length === MODULE_LIST.length ?
+        '全选' :
+        selectedModules.join(', '); // 直接显示选中项
     }
-
     function applyFilters() {
-      // ==== 新增：必须选择至少一个年级和模块 ====
+      // 自动处理空选择状态（修改重点）
       if (selectedGrades.length === 0) selectedGrades = [...GRADE_LIST];
       if (selectedModules.length === 0) selectedModules = [...MODULE_LIST];
-      // ==== 控制界面显隐 ====
+
+      // 控制界面显隐
       document.getElementById('filterPanel').style.display = 'none';
       document.getElementById('selectedInfo').style.display = 'flex';
 
-      // ==== 保存筛选状态 ====
+      // 保存筛选状态（包含全选状态）
       localStorage.setItem('selectedGrades', JSON.stringify(selectedGrades));
       localStorage.setItem('selectedModules', JSON.stringify(selectedModules));
 
-      // 处理空状态（视为全选）
-      const finalGrades = selectedGrades.length > 0 ? selectedGrades : GRADE_LIST;
-      const finalModules = selectedModules.length > 0 ? selectedModules : MODULE_LIST;
-
-      // ==== 数据过滤 ====
+      // 数据过滤逻辑
       allWords = flattenData(embeddedWordData).filter(word =>
-        finalGrades.includes(word.grade) &&
-        finalModules.includes(word.module)
+        selectedGrades.includes(word.grade) &&
+        selectedModules.includes(word.module)
       );
 
-      // ==== 同步已掌握单词 ====
+      // 同步已掌握单词
       masteredWords = masteredWords.filter(word =>
         allWords.some(w => w.word === word)
       );
       localStorage.setItem('masteredWords', JSON.stringify(masteredWords));
 
-      // ==== 更新进度和单词 ====
+      // 更新界面
       updateProgress();
       nextWord();
 
-      // ==== 修改点：优化竖排展示逻辑 ==== 🔵 新增代码块
+      // 更新筛选结果展示
       const formatDisplay = (list, fullText) => {
-        if (list.length === GRADE_LIST.length || list.length === MODULE_LIST.length) {
-          return `<span class="selected-item">${fullText}</span>`; // 全选时单行显示
-        } else {
-          // 竖排展示每个选项
-          return list.map(item => `<span class="selected-item">${item}</span>`).join('');
-        }
+        const isAll = list.length === (list === selectedGrades ? GRADE_LIST : MODULE_LIST).length;
+        return isAll ?
+          `<span class="selected-item">${fullText}</span>` :
+          list.map(item => `<span class="selected-item">${item}</span>`).join('');
       };
 
-      // 更新年级展示
-      document.getElementById('selectedGradeList').innerHTML =
-        formatDisplay(finalGrades, '全选'); // 修改为操作容器内容
-
-      // 更新单元展示
-      document.getElementById('selectedModuleList').innerHTML =
-        formatDisplay(finalModules, '全选'); // 修改为操作容器内容
+      document.getElementById('selectedGradeList').innerHTML = formatDisplay(selectedGrades, '全选');
+      document.getElementById('selectedModuleList').innerHTML = formatDisplay(selectedModules, '全选');
     }
-
     function flattenData(data) {
       return Object.entries(data).flatMap(([grade, modules]) =>
         Object.entries(modules).flatMap(([module, words]) =>
@@ -9542,31 +9572,39 @@
 
     function clearAllProgress() {
       if (confirm("确认要重置所有学习进度吗？")) {
-        // ==== 核心修改：完全重置状态 ====
+        // ==== 核心修改 ====
         // 1. 清空已掌握单词
         masteredWords = [];
         localStorage.removeItem('masteredWords');
 
-        // 2. 重置筛选状态（改为空数组）
-        selectedGrades = [...GRADE_LIST]; // 默认全选
-        selectedModules = [...MODULE_LIST]; // 默认全选
-        localStorage.removeItem('selectedGrades');
-        localStorage.removeItem('selectedModules');
+        // 2. 重置筛选状态（强制全选）
+        selectedGrades = [...GRADE_LIST];
+        selectedModules = [...MODULE_LIST];
 
-        // ==== 新增：强制显示筛选面板并隐藏信息 ====
+        // ==== 新增关键代码 ====
+        // 更新存储的筛选状态
+        localStorage.setItem('selectedGrades', JSON.stringify(selectedGrades));
+        localStorage.setItem('selectedModules', JSON.stringify(selectedModules));
+
+        // 强制显示筛选面板
         document.getElementById('filterPanel').style.display = 'block';
         document.getElementById('selectedInfo').style.display = 'none';
 
-        // 3. 重置标签显示为"全选"
-        document.getElementById('gradeLabel').textContent = '全选';
-        document.getElementById('moduleLabel').textContent = '全选';
+        // 3. 更新标签显示
+        updateSelectedLabels();
 
-        // 4. 重新初始化数据（而不是调用applyFilters）
+        // 4. 重新初始化数据
         allWords = flattenData(embeddedWordData);
+
+        // ==== 修改调用顺序 ====
+        //applyFilters();  // 需要在初始化数据后调用
+
+        // 5. 更新进度
         updateProgress();
         nextWord();
       }
     }
+
     function adjustFontSize() {
       const elements = [document.getElementById('current-word'), document.getElementById('translation')];
       elements.forEach(el => {
